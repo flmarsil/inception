@@ -1,0 +1,120 @@
+version: "3"
+
+services:
+  mariadb:
+    container_name: mariadb
+    image: mariadb
+    env_file:
+      - .env
+    build:
+      context: ./requirements/mariadb
+      dockerfile: Dockerfile
+    expose: # https://stackoverflow.com/questions/40801772/what-is-the-difference-between-docker-compose-ports-vs-expose
+      - "3306"
+    networks:
+      - inception_network
+    volumes:
+      - mariadb_data:$MARIADB_PATH
+    restart: always
+
+  wordpress:
+    container_name: wordpress
+    image: wordpress
+    env_file:
+      - .env
+    build:
+      context: ./requirements/wordpress
+      dockerfile: Dockerfile
+    expose:
+      - "9000"
+    networks:
+      - inception_network
+    volumes:
+      - wordpress_data:$WORDPRESS_PATH
+    depends_on:
+      - mariadb
+    restart: always
+
+  nginx:
+    container_name: nginx
+    image: nginx
+    env_file:
+      - .env
+    build:
+      context: ./requirements/nginx
+      dockerfile: Dockerfile
+    ports:
+      - "443:443"
+      - "8081:8081" # bonus adminer
+    networks:
+      - inception_network
+    volumes:
+      - wordpress_data:$WORDPRESS_PATH
+      - adminer_data:$ADMINER_PATH
+    depends_on:
+      - mariadb
+      - wordpress
+      - adminer
+      - redis
+    restart: always
+
+  adminer:
+    container_name: adminer
+    image: adminer
+    env_file:
+      - .env
+    build:
+      context: ./requirements/adminer
+      dockerfile: Dockerfile
+    expose:
+      - "8081"
+    networks:
+      - inception_network
+    volumes:
+      - adminer_data:$ADMINER_PATH
+    depends_on:
+      - mariadb
+    restart: always
+
+  redis:
+    container_name: redis
+    image: redis
+    env_file:
+      - .env
+    build:
+      context: ./requirements/redis
+      dockerfile: Dockerfile
+    expose:
+      - "6379"
+    networks:
+      - inception_network
+    depends_on:
+      - wordpress
+    restart: always
+
+volumes:
+  wordpress_data:
+    driver: local
+    driver_opts:
+      o: "bind"
+      type: "volume"
+      device: "$PWD/home/flmarsil/data/wordpress"
+      # device: "/home/flmarsil/data/wordpress"
+  mariadb_data:
+    driver: local
+    driver_opts:
+      o: "bind"
+      type: "volume"
+      device: "$PWD/home/flmarsil/data/mariadb"
+      # device: "/home/flmarsil/data/mariadb"
+  adminer_data:
+    driver: local
+    driver_opts:
+      o: "bind"
+      type: "volume"
+      device: "$PWD/home/flmarsil/data/adminer"
+  # device: "/home/flmarsil/data/adminer"
+
+networks:
+  inception_network:
+    driver: bridge
